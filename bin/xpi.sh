@@ -22,8 +22,8 @@ trap cleanup EXIT
 # fill templates, could be fancier
 echo $PWD
 alias moustache='/node_modules/bin/mustache'
-mustache package.json template/install.rdf.mustache > addon/install.rdf
-mustache package.json template/chrome.manifest.mustache > addon/chrome.manifest
+# mustache package.json template/install.rdf.mustache > addon/install.rdf
+# mustache package.json template/chrome.manifest.mustache > addon/chrome.manifest
 
 cp -rp addon/* $DEST
 
