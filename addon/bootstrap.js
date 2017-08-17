@@ -199,6 +199,7 @@ function observe(subject, topic, data) {
 
 
 async function startup(addonData, reason) {
+  /* Shield's bootstrap */
   // addonData: Array [ "id", "version", "installPath", "resourceURI", "instanceID", "webExtension" ]  bootstrap.js:48
   log.debug("startup", REASONS[reason] || reason);
   studyUtils.setup({
@@ -228,18 +229,10 @@ async function startup(addonData, reason) {
 
   console.log(`info ${JSON.stringify(studyUtils.info())}`);
   // if you have code to handle expiration / long-timers, it could go here.
-  const webExtension = addonData.webExtension;
-  webExtension.startup().then(api => {
-    const {browser} = api;
-    // messages intended for shieldn:  {shield:true,msg=[info|endStudy|telemetry],data=data}
-    browser.runtime.onMessage.addListener(studyUtils.respondToWebExtensionMessage);
-    //  other message handlers from your addon, if any
-  });
   // studyUtils.endStudy("user-disable");
-
-  /* Onboarding works */
+  /* Onboarding's bootstrap */
   if (reason === ADDON_INSTALL) {
-
+    Services.prefs.deleteBranch("browser.onboarding");
     // Preferences for Photon onboarding system extension
     Services.prefs.setBoolPref("browser.onboarding.enabled", true);
     // Mark this as an upgraded profile so we don't offer the initial new user onboarding tour.
@@ -249,14 +242,50 @@ async function startup(addonData, reason) {
     // So use `browser.onboarding.notification.finished` to let the AS page know
     // if our notification is finished and safe to show their snippet.
     Services.prefs.setBoolPref("browser.onboarding.notification.finished", false);
-    Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms", 300000); // 5 mins
-    Services.prefs.setIntPref("browser.onboarding.notification.max-life-time-per-tour-ms", 432000000); // 5 days
-    Services.prefs.setIntPref("browser.onboarding.notification.max-prompt-count-per-tour", 8);
-    Services.prefs.setStringPref("browser.onboarding.newtour", "private,addons,customize,search,default,sync");
     Services.prefs.setStringPref("browser.onboarding.updatetour", "");
-
     // Preference that allows individual users to disable Screenshots.
     Services.prefs.setBoolPref("extensions.screenshots.disabled", false);
+
+    let tourOrder;
+    let impressions;
+    let expires;
+    let firstSessionDelay;
+    switch(variation.name) {
+    case "var1":
+      tourOrder = "private,addons,customize,search,default,sync";
+      impressions = 4;
+      expires = 43200000;
+      firstSessionDelay = 120000;
+      break;
+    case "var2":
+      tourOrder = "private,search,addons,customize,default,sync";
+      impressions = 4;
+      expires = 43200000;
+      firstSessionDelay = 120000;
+      break;
+    case "var3":
+      tourOrder = "private,default,addons,customize,search,sync";
+      impressions = 4;
+      expires = 43200000;
+      firstSessionDelay = 120000;
+      break;
+    case "var4":
+      tourOrder = "private,default,addons,customize,search,sync";
+      impressions = 2;
+      expires = 21600000;
+      firstSessionDelay = 60000;
+      break;
+    default:
+      tourOrder = "private,addons,customize,search,default,sync";
+      impressions = 4;
+      expires = 86400000;
+      firstSessionDelay = 300000;
+      break;
+    };
+    Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms", firstSessionDelay);
+    Services.prefs.setIntPref("browser.onboarding.notification.max-life-time-per-tour-ms", expires);
+    Services.prefs.setIntPref("browser.onboarding.notification.max-prompt-count-per-tour", impressions);
+    Services.prefs.setStringPref("browser.onboarding.newtour", tourOrder);
   }
   // Only start Onboarding when the browser UI is ready
   if (Services.startup.startingUp) {

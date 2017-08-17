@@ -15,16 +15,21 @@ var EXPORTED_SYMBOLS = ["config"];
 var config = {
   "study": {
     "studyName": "mostImportantExperiment", // no spaces, for all the reasons
-    "variation": {
+    /*"variation": {
       "name": "puppers",
-    }, // optional, use to override/decide
+    },*/
+    // optional, use to override/decide
     "weightedVariations": [
-      {"name": "control",
+      {"name": "controlGroup",
         "weight": 1},
-      {"name": "kittens",
-        "weight": 1.5},
-      {"name": "puppers",
-        "weight": 2},  // we want more puppers in our sample
+      {"name": "var1",
+        "weight": 1},
+      {"name": "var2",
+        "weight": 1},
+      {"name": "var3",
+        "weight": 1},
+      {"name": "var4",
+        "weight": 1},
     ],
     /** **endings**
       * - keys indicate the 'endStudy' even that opens these.
