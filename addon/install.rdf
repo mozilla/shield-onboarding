@@ -13,7 +13,7 @@
     <em:bootstrap>true</em:bootstrap>
     <em:type>2</em:type>
     <em:multiprocessCompatible>true</em:multiprocessCompatible>
-    <em:hasEmbeddedWebExtension>true</em:hasEmbeddedWebExtension>
+    <em:hasEmbeddedWebExtension>false</em:hasEmbeddedWebExtension>
     <em:creator>Rex Lee &lt;rexboy@mozilla.com&gt;</em:creator>
     <em:unpack>false</em:unpack>
 
