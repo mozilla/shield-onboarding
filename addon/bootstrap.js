@@ -166,6 +166,10 @@ function initContentMessageListener() {
           isLoggedIn: syncTourChecker.isLoggedIn()
         });
         break;
+      case "shield-study":
+        studyUtils.respondToWebExtensionMessage(msg.data.params, null,
+                   response => console.log(JSON.stringify(response)));
+        break;
     }
   });
 }
@@ -197,8 +201,62 @@ function observe(subject, topic, data) {
   }
 }
 
+function onboardingVariationSetup(variationName) {
+  let tourOrder;
+  let impressions;
+  let expires;
+  let firstSessionDelay;
+  switch(variationName) {
+  case "var1":
+    tourOrder = "private,addons,customize,search,default,sync";
+    impressions = 4;
+    expires = 43200000;
+    firstSessionDelay = 120000;
+    break;
+  case "var2":
+    tourOrder = "private,search,addons,customize,default,sync";
+    impressions = 4;
+    expires = 43200000;
+    firstSessionDelay = 120000;
+    break;
+  case "var3":
+    tourOrder = "private,default,addons,customize,search,sync";
+    impressions = 4;
+    expires = 43200000;
+    firstSessionDelay = 120000;
+    break;
+  case "var4":
+    tourOrder = "private,default,addons,customize,search,sync";
+    impressions = 2;
+    expires = 21600000;
+    firstSessionDelay = 60000;
+    break;
+  default:
+    tourOrder = "private,addons,customize,search,default,sync";
+    impressions = 4;
+    expires = 86400000;
+    firstSessionDelay = 300000;
+    break;
+  };
+  Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms", firstSessionDelay);
+  Services.prefs.setIntPref("browser.onboarding.notification.max-life-time-per-tour-ms", expires);
+  Services.prefs.setIntPref("browser.onboarding.notification.max-prompt-count-per-tour", impressions);
+  Services.prefs.setStringPref("browser.onboarding.newtour", tourOrder);
+  Services.prefs.setStringPref("browser.onboarding.updatetour", "");
+  Services.prefs.setIntPref("browser.onboarding.tourset-version", 1);
+  Services.prefs.setBoolPref("browser.onboarding.notification.finished", false);
+  Services.prefs.setBoolPref("browser.onboarding.hidden", false);
+}
 
 async function startup(addonData, reason) {
+  if (reason === ADDON_INSTALL) {
+    // Preferences for Photon onboarding system extension
+    Services.prefs.setBoolPref("browser.onboarding.enabled", false);
+  };
+  if (!Services.prefs.getBoolPref("browser.onboarding.enabled", false)) {
+    return;
+  }
+
   /* Shield's bootstrap */
   // addonData: Array [ "id", "version", "installPath", "resourceURI", "instanceID", "webExtension" ]  bootstrap.js:48
   log.debug("startup", REASONS[reason] || reason);
@@ -228,65 +286,8 @@ async function startup(addonData, reason) {
   await studyUtils.startup({reason});
 
   console.log(`info ${JSON.stringify(studyUtils.info())}`);
-  // if you have code to handle expiration / long-timers, it could go here.
-  // studyUtils.endStudy("user-disable");
-  /* Onboarding's bootstrap */
-  if (reason === ADDON_INSTALL) {
-    Services.prefs.deleteBranch("browser.onboarding");
-    // Preferences for Photon onboarding system extension
-    Services.prefs.setBoolPref("browser.onboarding.enabled", true);
-    // Mark this as an upgraded profile so we don't offer the initial new user onboarding tour.
-    Services.prefs.setIntPref("browser.onboarding.tourset-version", 1);
-    Services.prefs.setBoolPref("browser.onboarding.hidden", false);
-    // On the Activity-Stream page, the snippet's position overlaps with our notification.
-    // So use `browser.onboarding.notification.finished` to let the AS page know
-    // if our notification is finished and safe to show their snippet.
-    Services.prefs.setBoolPref("browser.onboarding.notification.finished", false);
-    Services.prefs.setStringPref("browser.onboarding.updatetour", "");
-    // Preference that allows individual users to disable Screenshots.
-    Services.prefs.setBoolPref("extensions.screenshots.disabled", false);
 
-    let tourOrder;
-    let impressions;
-    let expires;
-    let firstSessionDelay;
-    switch(variation.name) {
-    case "var1":
-      tourOrder = "private,addons,customize,search,default,sync";
-      impressions = 4;
-      expires = 43200000;
-      firstSessionDelay = 120000;
-      break;
-    case "var2":
-      tourOrder = "private,search,addons,customize,default,sync";
-      impressions = 4;
-      expires = 43200000;
-      firstSessionDelay = 120000;
-      break;
-    case "var3":
-      tourOrder = "private,default,addons,customize,search,sync";
-      impressions = 4;
-      expires = 43200000;
-      firstSessionDelay = 120000;
-      break;
-    case "var4":
-      tourOrder = "private,default,addons,customize,search,sync";
-      impressions = 2;
-      expires = 21600000;
-      firstSessionDelay = 60000;
-      break;
-    default:
-      tourOrder = "private,addons,customize,search,default,sync";
-      impressions = 4;
-      expires = 86400000;
-      firstSessionDelay = 300000;
-      break;
-    };
-    Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms", firstSessionDelay);
-    Services.prefs.setIntPref("browser.onboarding.notification.max-life-time-per-tour-ms", expires);
-    Services.prefs.setIntPref("browser.onboarding.notification.max-prompt-count-per-tour", impressions);
-    Services.prefs.setStringPref("browser.onboarding.newtour", tourOrder);
-  }
+  onboardingVariationSetup(variation.name);
   // Only start Onboarding when the browser UI is ready
   if (Services.startup.startingUp) {
     Services.obs.addObserver(observe, BROWSER_READY_NOTIFICATION);
@@ -300,6 +301,16 @@ async function startup(addonData, reason) {
 
 function shutdown(addonData, reason) {
   console.log("shutdown", REASONS[reason] || reason);
+  if (!Services.prefs.getBoolPref("browser.onboarding.enabled", false)) {
+    return;
+  }
+  console.log("shutdown", REASONS[reason] || reason);
+  // Stop waiting for browser to be ready
+  if (waitingForBrowserReady) {
+    Services.obs.removeObserver(observe, BROWSER_READY_NOTIFICATION);
+  }
+
+  syncTourChecker.uninit();
   // are we uninstalling?
   // if so, user or automatic?
   if (reason === REASONS.ADDON_UNINSTALL || reason === REASONS.ADDON_DISABLE) {
@@ -316,13 +327,6 @@ function shutdown(addonData, reason) {
     Jsm.unload(config.modules);
     Jsm.unload([CONFIGPATH, STUDYUTILSPATH]);
   }
-
-  /* Onboarding works */
-  // Stop waiting for browser to be ready
-  if (waitingForBrowserReady) {
-    Services.obs.removeObserver(observe, BROWSER_READY_NOTIFICATION);
-  }
-  syncTourChecker.uninit();
 }
 
 function uninstall(addonData, reason) {

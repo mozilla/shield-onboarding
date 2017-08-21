@@ -334,6 +334,27 @@ function sendMessageToChrome(action, params) {
     action, params
   });
 }
+
+function telemetry (data) {
+  function throwIfInvalid (obj) {
+    // simple, check is all keys and values are strings
+    for (const k in obj) {
+      if (typeof k !== 'string') throw new Error(`key ${k} not a string`);
+      if (typeof obj[k] !== 'string') throw new Error(`value ${k} ${obj[k]} not a string`);
+    }
+    return true
+  }
+  msgStudy("telemetry", data);
+}
+
+
+// template code for talking to `studyUtils`
+function msgStudy(msg, data) {
+  const allowed = ["endStudy", "telemetry", "info"];
+  if (!allowed.includes(msg)) throw new Error(`shieldUtils doesn't know ${msg}, only knows ${allowed}`);
+  sendMessageToChrome("shield-study", {shield: true, msg, data});
+}
+
 /**
  * The script won't be initialized if we turned off onboarding by
  * setting "browser.onboarding.enabled" to false.
@@ -486,10 +507,12 @@ class Onboarding {
       case "onboarding-notification-close-btn":
         this.hideNotification();
         this._removeTourFromNotificationQueue(this._notificationBar.dataset.targetTourId);
+        telemetry({evt: "notificationClosed", tourId: this._notificationBar.dataset.targetTourId});
         break;
       case "onboarding-notification-action-btn":
         let tourId = this._notificationBar.dataset.targetTourId;
         this.toggleOverlay();
+        telemetry({evt: "notificationClicked", tourId: this._notificationBar.dataset.targetTourId});
         this.gotoPage(tourId);
         this._removeTourFromNotificationQueue(tourId);
         break;
@@ -505,14 +528,29 @@ class Onboarding {
       this.gotoPage(evt.target.id);
     } else if (classList.contains("onboarding-tour-action-button")) {
       let activeItem = this._tourItems.find(item => item.classList.contains("onboarding-active"));
+      telemetry({evt: "tourButtonClicked", tourId: activeItem.id});
       this.setToursCompleted([ activeItem.id ]);
     }
+  }
+
+  sendSummaryTelemetry() {
+    telemetry({
+      evt: "summary",
+      addonsCompleted: Services.prefs.getBoolPref("browser.onboarding.tour.onboarding-tour-addons.completed", false).toString(),
+      customizeCompleted: Services.prefs.getBoolPref("browser.onboarding.tour.onboarding-tour-customize.completed", false).toString(),
+      defaultBrowserCompleted: Services.prefs.getBoolPref("browser.onboarding.tour.onboarding-tour-default-browser.completed", false).toString(),
+      privateBrowsingCompleted: Services.prefs.getBoolPref("browser.onboarding.tour.onboarding-tour-private-browsing.completed", false).toString(),
+      searchCompleted: Services.prefs.getBoolPref("browser.onboarding.tour.onboarding-tour-search.completed", false).toString(),
+      syncCompleted: Services.prefs.getBoolPref("browser.onboarding.tour.onboarding-tour-sync.completed", false).toString(),
+      hide: Services.prefs.getBoolPref("browser.onboarding.hidden", false).toString()
+    });
   }
 
   destroy() {
     if (!this.uiInitialized) {
       return;
     }
+    this.sendSummaryTelemetry();
     this.uiInitialized = false;
 
     this._clearPrefObserver();
@@ -524,6 +562,7 @@ class Onboarding {
 
     this._tourItems = this._tourPages =
     this._overlayIcon = this._overlay = this._notificationBar = null;
+
   }
 
   toggleOverlay() {
@@ -533,10 +572,12 @@ class Onboarding {
     }
 
     this.hideNotification();
-    this._overlay.classList.toggle("onboarding-opened");
+    let isOpened = this._overlay.classList.toggle("onboarding-opened");
+    telemetry({evt: "overlayToggled", isOpened: isOpened.toString()});
 
     let hiddenCheckbox = this._window.document.getElementById("onboarding-tour-hidden-checkbox");
     if (hiddenCheckbox.checked) {
+      telemetry({evt: "didManualHide"});
       this.hide();
     }
   }
@@ -558,6 +599,9 @@ class Onboarding {
         li.classList.remove("onboarding-active");
       }
     }
+    if(this._overlay.classList.contains("onboarding-opened")) {
+      telemetry({evt: "gotoPage", tourId: tourId});
+    }
   }
 
   isTourCompleted(tourId) {
@@ -573,6 +617,7 @@ class Onboarding {
           value: true
         });
       }
+      telemetry({evt: "tourCompleted", tourId: id});
     });
     if (params.length > 0) {
       sendMessageToChrome("set-prefs", params);
@@ -711,12 +756,15 @@ class Onboarding {
     let notificationStrings = targetTour.getNotificationStrings(this._bundle);
     let actionBtn = this._notificationBar.querySelector("#onboarding-notification-action-btn");
     actionBtn.textContent = notificationStrings.button;
+    actionBtn.addEventListener("click", () => telemetry({evt: "clickOnNotification", name: targetTourId}));
     let tourTitle = this._notificationBar.querySelector("#onboarding-notification-tour-title");
     tourTitle.textContent = notificationStrings.title;
     let tourMessage = this._notificationBar.querySelector("#onboarding-notification-tour-message");
     tourMessage.textContent = notificationStrings.message;
     this._notificationBar.classList.add("onboarding-opened");
     this._window.document.body.appendChild(this._notificationBar);
+
+    telemetry({evt: "notificationShown", tourId: targetTour.id});
 
     let params = [];
     if (startQueueLength != queue.length) {
