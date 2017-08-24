@@ -50,8 +50,6 @@ const PREF_WHITELIST = [
   "onboarding-tour-sync",
 ].forEach(tourId => PREF_WHITELIST.push([`browser.onboarding.tour.${tourId}.completed`, PREF_BOOL]));
 
-let waitingForBrowserReady = true;
-
 /**
  * Set pref. Why no `getPrefs` function is due to the priviledge level.
  * We cannot set prefs inside a framescript but can read.
@@ -178,7 +176,6 @@ function initContentMessageListener() {
  * onBrowserReady - Continues startup of the add-on after browser is ready.
  */
 function onBrowserReady() {
-  waitingForBrowserReady = false;
 
   OnboardingTourType.check();
   Services.mm.loadFrameScript("resource://onboarding/onboarding.js", true);
@@ -252,49 +249,60 @@ async function startup(addonData, reason) {
   if (reason === ADDON_INSTALL) {
     // Preferences for Photon onboarding system extension
     Services.prefs.setBoolPref("browser.onboarding.enabled", false);
-  };
-  if (!Services.prefs.getBoolPref("browser.onboarding.enabled", false)) {
-    return;
   }
 
-  /* Shield's bootstrap */
-  // addonData: Array [ "id", "version", "installPath", "resourceURI", "instanceID", "webExtension" ]  bootstrap.js:48
-  log.debug("startup", REASONS[reason] || reason);
-  studyUtils.setup({
-    studyName: studyConfig.studyName,
-    endings: studyConfig.endings,
-    addon: {id: addonData.id, version: addonData.version},
-    telemetry: studyConfig.telemetry,
-  });
-  studyUtils.setLoggingLevel(config.log.studyUtils.level);
-  const variation = await chooseVariation();
-  studyUtils.setVariation(variation);
+  async function afterPrefOn() {
+    /* Shield's bootstrap */
+    // addonData: Array [ "id", "version", "installPath", "resourceURI", "instanceID", "webExtension" ]  bootstrap.js:48
+    log.debug("startup", REASONS[reason] || reason);
+    studyUtils.setup({
+      studyName: studyConfig.studyName,
+      endings: studyConfig.endings,
+      addon: {id: addonData.id, version: addonData.version},
+      telemetry: studyConfig.telemetry,
+    });
+    studyUtils.setLoggingLevel(config.log.studyUtils.level);
+    const variation = await chooseVariation();
+    studyUtils.setVariation(variation);
 
-  Jsm.import(config.modules);
+    Jsm.import(config.modules);
 
-  if ((REASONS[reason]) === "ADDON_INSTALL") {
-    studyUtils.firstSeen();  // sends telemetry "enter"
-    const eligible = await config.isEligible(); // addon-specific
-    if (!eligible) {
-      // uses config.endings.ineligible.url if any,
-      // sends UT for "ineligible"
-      // then uninstalls addon
-      await studyUtils.endStudy({reason: "ineligible"});
-      return;
+    if ((REASONS[reason]) === "ADDON_INSTALL") {
+      studyUtils.firstSeen();  // sends telemetry "enter"
+      const eligible = await config.isEligible(); // addon-specific
+      if (!eligible) {
+        // uses config.endings.ineligible.url if any,
+        // sends UT for "ineligible"
+        // then uninstalls addon
+        await studyUtils.endStudy({reason: "ineligible"});
+        return;
+      }
+    }
+    await studyUtils.startup({reason});
+
+    console.log(`info ${JSON.stringify(studyUtils.info())}`);
+
+    onboardingVariationSetup(variation.name);
+    // Only start Onboarding when the browser UI is ready
+    if (Services.startup.startingUp) {
+      Services.obs.addObserver(observe, BROWSER_READY_NOTIFICATION);
+      Services.obs.addObserver(observe, BROWSER_SESSION_STORE_NOTIFICATION);
+    } else {
+      onBrowserReady();
+      syncTourChecker.init();
     }
   }
-  await studyUtils.startup({reason});
-
-  console.log(`info ${JSON.stringify(studyUtils.info())}`);
-
-  onboardingVariationSetup(variation.name);
-  // Only start Onboarding when the browser UI is ready
-  if (Services.startup.startingUp) {
-    Services.obs.addObserver(observe, BROWSER_READY_NOTIFICATION);
-    Services.obs.addObserver(observe, BROWSER_SESSION_STORE_NOTIFICATION);
+  if (!Services.prefs.getBoolPref("browser.onboarding.enabled", false)) {
+    Services.prefs.addObserver("browser.onboarding.enabled", {
+      observe: function(aSubject, aTopic, aData) {
+        Services.prefs.removeObserver("browser.onboarding.enabled", this);
+        if (Services.prefs.getBoolPref("browser.onboarding.enabled", false) === true) {
+          afterPrefOn();
+        }
+      }
+    });
   } else {
-    onBrowserReady();
-    syncTourChecker.init();
+    afterPrefOn();
   }
 }
 
@@ -306,7 +314,7 @@ function shutdown(addonData, reason) {
   }
   console.log("shutdown", REASONS[reason] || reason);
   // Stop waiting for browser to be ready
-  if (waitingForBrowserReady) {
+  if (Services.startup.startingUp) {
     Services.obs.removeObserver(observe, BROWSER_READY_NOTIFICATION);
   }
 

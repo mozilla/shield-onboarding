@@ -954,8 +954,8 @@ if (Services.prefs.getBoolPref("browser.onboarding.enabled", false) &&
     if (!content || evt.target != content.document) {
       return;
     }
-    removeEventListener("load", onLoad);
 
+    removeEventListener("load", onLoad);
     let window = evt.target.defaultView;
     let location = window.location.href;
     if (location == ABOUT_NEWTAB_URL || location == ABOUT_HOME_URL) {
