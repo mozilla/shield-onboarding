@@ -30,6 +30,7 @@ const {PREF_STRING, PREF_BOOL, PREF_INT} = Ci.nsIPrefBranch;
 const BROWSER_READY_NOTIFICATION = "browser-delayed-startup-finished";
 const BROWSER_SESSION_STORE_NOTIFICATION = "sessionstore-windows-restored";
 const PREF_WHITELIST = [
+  ["browser.onboarding.shieldstudy.enabled", PREF_BOOL],
   ["browser.onboarding.enabled", PREF_BOOL],
   ["browser.onboarding.hidden", PREF_BOOL],
   ["browser.onboarding.notification.finished", PREF_BOOL],
@@ -248,13 +249,14 @@ function onboardingVariationSetup(variationName) {
 async function startup(addonData, reason) {
   if (reason === ADDON_INSTALL) {
     // Preferences for Photon onboarding system extension
-    Services.prefs.setBoolPref("browser.onboarding.enabled", false);
+    Services.prefs.setBoolPref("browser.onboarding.shieldstudy.enabled", false);
   }
+  let variation;
 
-  async function afterPrefOn() {
-    /* Shield's bootstrap */
+  async function startupStudyUtils() {
     // addonData: Array [ "id", "version", "installPath", "resourceURI", "instanceID", "webExtension" ]  bootstrap.js:48
     log.debug("startup", REASONS[reason] || reason);
+
     studyUtils.setup({
       studyName: studyConfig.studyName,
       endings: studyConfig.endings,
@@ -262,22 +264,24 @@ async function startup(addonData, reason) {
       telemetry: studyConfig.telemetry,
     });
     studyUtils.setLoggingLevel(config.log.studyUtils.level);
-    const variation = await chooseVariation();
+    variation = await chooseVariation();
     studyUtils.setVariation(variation);
 
     Jsm.import(config.modules);
+  }
 
-    if ((REASONS[reason]) === "ADDON_INSTALL") {
-      studyUtils.firstSeen();  // sends telemetry "enter"
-      const eligible = await config.isEligible(); // addon-specific
-      if (!eligible) {
-        // uses config.endings.ineligible.url if any,
-        // sends UT for "ineligible"
-        // then uninstalls addon
-        await studyUtils.endStudy({reason: "ineligible"});
-        return;
-      }
+  async function firstTimePrefOn() {
+    studyUtils.firstSeen();  // sends telemetry "enter"
+    const eligible = await config.isEligible(); // addon-specific
+    if (!eligible) {
+      // uses config.endings.ineligible.url if any,
+      // sends UT for "ineligible"
+      // then uninstalls addon
+      await studyUtils.endStudy({reason: "ineligible"});
     }
+  }
+
+  async function initialize() {
     await studyUtils.startup({reason});
 
     console.log(`info ${JSON.stringify(studyUtils.info())}`);
@@ -292,24 +296,28 @@ async function startup(addonData, reason) {
       syncTourChecker.init();
     }
   }
-  if (!Services.prefs.getBoolPref("browser.onboarding.enabled", false)) {
-    Services.prefs.addObserver("browser.onboarding.enabled", {
-      observe: function(aSubject, aTopic, aData) {
-        Services.prefs.removeObserver("browser.onboarding.enabled", this);
-        if (Services.prefs.getBoolPref("browser.onboarding.enabled", false) === true) {
-          afterPrefOn();
+
+  if (!Services.prefs.getBoolPref("browser.onboarding.shieldstudy.enabled", false)) {
+    Services.prefs.addObserver("browser.onboarding.shieldstudy.enabled", {
+      observe: async function(aSubject, aTopic, aData) {
+        Services.prefs.removeObserver("browser.onboarding.shieldstudy.enabled", this);
+        if (Services.prefs.getBoolPref("browser.onboarding.shieldstudy.enabled", false) === true) {
+          await startupStudyUtils();
+          await firstTimePrefOn();
+          await initialize();
         }
       }
     });
   } else {
-    afterPrefOn();
+    await startupStudyUtils();
+    await initialize();
   }
 }
 
 
 function shutdown(addonData, reason) {
   console.log("shutdown", REASONS[reason] || reason);
-  if (!Services.prefs.getBoolPref("browser.onboarding.enabled", false)) {
+  if (!Services.prefs.getBoolPref("browser.onboarding.shieldstudy.enabled", false)) {
     return;
   }
   console.log("shutdown", REASONS[reason] || reason);

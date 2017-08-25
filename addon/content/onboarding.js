@@ -357,7 +357,7 @@ function msgStudy(msg, data) {
 
 /**
  * The script won't be initialized if we turned off onboarding by
- * setting "browser.onboarding.enabled" to false.
+ * setting "browser.onboarding.shieldstudy.enabled" to false.
  */
 class Onboarding {
   constructor(contentWindow) {
@@ -947,9 +947,8 @@ class Onboarding {
 }
 
 // Load onboarding module only when we enable it.
-if (Services.prefs.getBoolPref("browser.onboarding.enabled", false) &&
+if (Services.prefs.getBoolPref("browser.onboarding.shieldstudy.enabled", false) &&
     !Services.prefs.getBoolPref("browser.onboarding.hidden", false)) {
-
   addEventListener("load", function onLoad(evt) {
     if (!content || evt.target != content.document) {
       return;
