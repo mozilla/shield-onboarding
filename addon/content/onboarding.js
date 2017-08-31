@@ -507,7 +507,6 @@ class Onboarding {
       case "onboarding-notification-close-btn":
         this.hideNotification();
         this._removeTourFromNotificationQueue(this._notificationBar.dataset.targetTourId);
-        telemetry({evt: "notificationClosed", tourId: this._notificationBar.dataset.targetTourId});
         break;
       case "onboarding-notification-action-btn":
         let tourId = this._notificationBar.dataset.targetTourId;
@@ -794,6 +793,7 @@ class Onboarding {
   hideNotification() {
     if (this._notificationBar) {
       this._notificationBar.classList.remove("onboarding-opened");
+      telemetry({evt: "notificationClosed", tourId: this._notificationBar.dataset.targetTourId});
     }
   }
 
