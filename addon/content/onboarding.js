@@ -874,7 +874,7 @@ class Onboarding {
   }
 
   _renderOverlayButton() {
-    let button = this._window.document.createElement("button");
+    let button = this._window.document.createElement("div");
     let tooltipStringId = this._tourType === "new" ?
       "onboarding.overlay-icon-tooltip" : "onboarding.overlay-icon-tooltip-updated";
     let tooltip = this._bundle.formatStringFromName(tooltipStringId, [BRAND_SHORT_NAME], 1);
