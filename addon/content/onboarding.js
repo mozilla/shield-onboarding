@@ -239,7 +239,12 @@ var onboardingTourset = {
         sendMessageToChrome("get-login-status");
         addMessageListener("Onboarding:ResponseLoginStatus", loginStatusListener);
       });
-
+      div.addEventListener("click", evt => {
+        if (evt.target.id === "onboarding-tour-sync-button" &&
+            emailInput.checkValidity()) {
+          sendMessageToChrome("show-firefox-accounts", [emailInput.value]);
+        }
+      });
       return div;
     },
   },

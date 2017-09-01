@@ -165,6 +165,11 @@ function initContentMessageListener() {
           isLoggedIn: syncTourChecker.isLoggedIn()
         });
         break;
+      case "show-firefox-accounts":
+        let email = msg.data.params[0];
+        Services.wm.getMostRecentWindow("navigator:browser").gBrowser.loadURI(
+          "about:accounts?action=signup&email=" + encodeURIComponent(email));
+        break;
       case "shield-study":
         studyUtils.respondToWebExtensionMessage(msg.data.params, null,
                    response => console.log(JSON.stringify(response)));
