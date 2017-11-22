@@ -28,7 +28,7 @@ var config = {
     // required keys: studyName, endings, telemetry
 
     // will be used activeExperiments tagging
-    "studyName": "buttonFeatureExperiment",
+    "studyName": "onboardingNotificationExperiment",
 
     /** **endings**
       * - keys indicate the 'endStudy' even that opens these.
@@ -87,18 +87,14 @@ var config = {
     return true;
   },
 
-  /* Button study branches and sample weights
-     - test kittens vs. puppies if we can only have one.
-       - downweight lizards.  Lizards is a 'poison' branch, meant to
-         help control for novelty effect
-  */
+  /* Onboarding study branches and sample weights
+   *  - test normal vs. no notification.
+   */
   "weightedVariations": [
-    {"name": "kittens",
-      "weight": 1.5},
-    {"name": "puppers",
-      "weight": 1.5},
-    {"name": "lizard",
-      "weight": 1},  // we want more puppers in our sample
+    {"name": "noNotification",
+      "weight": 1},
+    {"name": "controlGroup",
+      "weight": 1},
   ],
 
 

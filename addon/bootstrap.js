@@ -27,8 +27,8 @@ log.level = Services.prefs.getIntPref(PREF_LOGGING_LEVEL, Log.Level.Warn);
 
 
 // QA NOTE: Study Specific Modules - package.json:addon.chromeResource
-const BASE = `button-icon-preference`;
-XPCOMUtils.defineLazyModuleGetter(this, "Feature", `resource://${BASE}/lib/Feature.jsm`);
+// const BASE = `button-icon-preference`;
+// XPCOMUtils.defineLazyModuleGetter(this, "Feature", `resource://${BASE}/lib/Feature.jsm`);
 
 
 /* Example addon-specific module imports.  Remember to Unload during shutdown!
@@ -46,6 +46,23 @@ XPCOMUtils.defineLazyModuleGetter(this, "Feature", `resource://${BASE}/lib/Featu
   XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
     "resource://gre/modules/Preferences.jsm");
 */
+function onboardingVariationSetup(variationName) {
+  switch (variationName) {
+    case "noNotification":
+      Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms",
+        1209600000);
+      Services.prefs.clearUserPref("browser.onboarding.notification.tour-ids-queue");
+      break;
+    default: // controlGroup
+      fallbackToDefaultOnboarding();
+      break;
+  }
+}
+
+function fallbackToDefaultOnboarding() {
+  Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms",
+    300000);
+}
 
 async function startup(addonData, reason) {
   // `addonData`: Array [ "id", "version", "installPath", "resourceURI", "instanceID", "webExtension" ]  bootstrap.js:48
@@ -106,8 +123,10 @@ async function startup(addonData, reason) {
   // log what the study variation and other info is.
   log.debug(`info ${JSON.stringify(studyUtils.info())}`);
 
+  onboardingVariationSetup(variation.name);
+
   // Start up your feature, with specific variation info.
-  this.feature = new Feature({variation, studyUtils, reasonName: REASONS[reason]});
+  // this.feature = new Feature({variation, studyUtils, reasonName: REASONS[reason]});
 }
 
 /** Shutdown needs to distinguish between USER-DISABLE and other
@@ -117,6 +136,7 @@ async function startup(addonData, reason) {
   */
 function shutdown(addonData, reason) {
   log.debug("shutdown", REASONS[reason] || reason);
+  fallbackToDefaultOnboarding();
   // FRAGILE: handle uninstalls initiated by USER or by addon
   if (reason === REASONS.ADDON_UNINSTALL || reason === REASONS.ADDON_DISABLE) {
     log.debug("uninstall or disable");
@@ -129,8 +149,8 @@ function shutdown(addonData, reason) {
     // normal shutdown, or 2nd uninstall request
 
     // QA NOTE:  unload addon specific modules here.
-    Cu.unload(`resource://${BASE}/lib/Feature.jsm`);
-    this.feature.shutdown();
+    // Cu.unload(`resource://${BASE}/lib/Feature.jsm`);
+    // this.feature.shutdown();
 
     // clean up our modules.
     Cu.unload(CONFIGPATH);
