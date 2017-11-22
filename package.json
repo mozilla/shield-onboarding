@@ -5,7 +5,7 @@
   "author": "Mozilla Gregg Lind <glind@mozilla.com>",
   "addon": {
     "$ABOUT": "use these variables fill the moustache templates",
-    "id": "onboarding-shield@mozilla.org",
+    "id": "onboarding@shield.mozilla.org",
     "name": "Photon onboarding",
     "minVersion": "57.0",
     "maxVersion": "*",
