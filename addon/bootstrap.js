@@ -51,6 +51,7 @@ function onboardingVariationSetup(variationName) {
     case "noNotification":
       Services.prefs.setIntPref("browser.onboarding.notification.mute-duration-on-first-session-ms",
         1209600000);
+      Services.prefs.clearUserPref("browser.onboarding.notification.last-time-of-changing-tour-sec");
       Services.prefs.clearUserPref("browser.onboarding.notification.tour-ids-queue");
       break;
     default: // controlGroup

@@ -1,7 +1,7 @@
 {
   "name": "shield-studies-addon-template",
   "description": "Template Shield Study",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "Mozilla Gregg Lind <glind@mozilla.com>",
   "addon": {
     "$ABOUT": "use these variables fill the moustache templates",
@@ -14,7 +14,7 @@
     "chromeResource": "button-icon-preference",
     "creator": "Fred Lin <gasolin@mozilla.com>",
     "description": "Onboarding Notification Engagement Experiment",
-    "bugzilla": "<tbd: bug to attach for signing>",
+    "bugzilla": "https://bugzilla.mozilla.org/show_bug.cgi?id=1420373",
     "iconPath": "icon.png"
   },
   "bugs": {
